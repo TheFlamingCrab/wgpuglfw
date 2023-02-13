@@ -1,6 +1,7 @@
 use glfw::{Action, Context, Key};
 
 struct State<'a> {
+    instance: wgpu::Instance,
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -58,7 +59,8 @@ impl State<'_> {
             .copied()
             .filter(|f| f.describe().srgb)
             .next()
-            .unwrap_or(surface_caps.formats=[0]);
+            .unwrap_or(surface_caps.formats[0]);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -71,6 +73,7 @@ impl State<'_> {
         surface.configure(&device, &config);
 
         State {
+            instance,
             window,
             surface,
             device,
@@ -91,6 +94,10 @@ impl State<'_> {
             self.config.height = new_size.1 as u32;
             self.surface.configure(&self.device, &self.config);
         }   
+    }
+
+    fn update_surface(&mut self) {
+        unsafe { self.instance.create_surface(&*self.window) }.unwrap();
     }
 
     fn input(&mut self, event: &glfw::WindowEvent) -> bool {
@@ -146,6 +153,7 @@ pub async fn run() {
 
     let mut state = State::new(&mut window).await;
 
+    state.window.set_framebuffer_size_polling(true);
     state.window.set_key_polling(true);
     state.window.set_mouse_button_polling(true);
     state.window.make_current();
@@ -161,7 +169,10 @@ pub async fn run() {
                         state.window.set_should_close(true)
                     }
                     glfw::WindowEvent::FramebufferSize(width, height) => {
+                        state.update_surface(); 
                         state.resize((width, height));
+                        state.render();
+                        state.window.swap_buffers();
                     }
                     _ => {}
                 }
